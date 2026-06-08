@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>차량 서류 출력 — 송성민</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #e0ddd4;
+    --text: #1a1a18;
+    --text2: #6b6a63;
+    --text3: #a09f98;
+    --accent: #1a1a18;
+    --accent-light: #f0efe9;
+    --green: #2d6a4f;
+    --green-bg: #e8f5ee;
+    --red: #c0392b;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── 헤더 ── */
+  .app-header {
+    background: var(--accent);
+    color: #fff;
+    padding: 16px 20px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .app-header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .app-header p  { font-size: 12px; opacity: 0.55; margin-top: 1px; }
+
+  /* ── 탭 ── */
+  .tabs {
+    display: flex;
+    background: var(--accent);
+    padding: 0 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 0 11px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: rgba(255,255,255,0.45);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    transition: all .15s;
+    letter-spacing: -0.2px;
+  }
+  .tab-btn.active { color: #fff; border-bottom-color: #fff; }
+
+  /* ── 본문 ── */
+  .content { padding: 16px; max-width: 600px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* ── 카드 ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text3);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── 폼 ── */
+  .row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .row:last-child { margin-bottom: 0; }
+  .field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 100px; }
+  .field.wide { flex: 2; }
+  .field label { font-size: 11px; font-weight: 500; color: var(--text2); }
+  .field input {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 9px 11px;
+    width: 100%;
+    outline: none;
+    transition: border-color .15s;
+    -webkit-appearance: none;
+  }
+  .field input:focus { border-color: var(--accent); background: #fff; }
+
+  /* ── 업로드 존 ── */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 28px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+    background: var(--surface2);
+  }
+  .upload-zone:hover, .upload-zone.drag {
+    border-color: var(--accent);
+    background: #f9f8f5;
+  }
+  .upload-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    font-size: 0;
+  }
+  .upload-icon { font-size: 36px; margin-bottom: 8px; }
+  .upload-text { font-size: 14px; font-weight: 500; color: var(--text2); }
+  .upload-sub  { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  /* ── 미리보기 ── */
+  .kiro-preview {
+    margin-top: 14px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    display: none;
+    position: relative;
+  }
+  .kiro-preview img { width: 100%; display: block; max-height: 260px; object-fit: contain; background: #000; }
+  .kiro-preview .change-btn {
+    position: absolute;
+    top: 8px; right: 8px;
+    background: rgba(0,0,0,.6);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: 'Noto Sans KR', sans-serif;
+    cursor: pointer;
+  }
+
+  /* ── 영수증 썸네일 ── */
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .thumb-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .thumb {
+    position: relative;
+    aspect-ratio: 2/3;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: #000;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: contain; }
+  .thumb .del {
+    position: absolute; top: 4px; right: 4px;
+    background: rgba(0,0,0,.65); color: #fff;
+    border: none; border-radius: 50%;
+    width: 22px; height: 22px;
+    font-size: 13px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .thumb .num {
+    position: absolute; bottom: 4px; left: 4px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+  .add-more {
+    aspect-ratio: 2/3;
+    border-radius: var(--radius-sm);
+    border: 2px dashed var(--border);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    background: var(--surface2);
+    color: var(--text3);
+    font-size: 11px;
+    gap: 4px;
+    transition: all .15s;
+  }
+  .add-more:hover { border-color: var(--accent); color: var(--text2); }
+  .add-more input[type=file] {
+    position: absolute; inset: 0; opacity: 0;
+    cursor: pointer; width: 100%; height: 100%; font-size: 0;
+  }
+  .add-more-icon { font-size: 24px; }
+
+  /* ── 안내 바 ── */
+  .info-bar {
+    font-size: 12px;
+    color: var(--text2);
+    background: var(--green-bg);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-top: 10px;
+    display: none;
+    line-height: 1.5;
+  }
+
+  /* ── 버튼 ── */
+  .btn-row { display: flex; gap: 8px; margin-top: 4px; justify-content: flex-end; }
+  .btn {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px 20px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text2);
+    transition: all .15s;
+    letter-spacing: -0.2px;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn.primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn.primary:hover { opacity: .85; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* ── PDF 미리보기 (숨김, 렌더링용) ── */
+  #pdf-render-area {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 794px; /* A4 96dpi */
+    background: #fff;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .pdf-kiro-page {
+    width: 794px;
+    height: 1123px;
+    padding: 40px 44px 36px;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+  }
+  .pdf-kiro-header {
+    text-align: center;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 2px solid #1a1a18;
+  }
+  .pdf-kiro-header .title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a18;
+    letter-spacing: -0.5px;
+    margin-bottom: 5px;
+  }
+  .pdf-kiro-header .sub {
+    font-size: 14px;
+    color: #555;
+  }
+  .pdf-kiro-photo {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .pdf-kiro-photo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  .pdf-kiro-footer {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .pdf-receipt-page {
+    width: 794px;
+    min-height: 1123px;
+    padding: 28px 32px 28px;
+    background: #fff;
+    page-break-after: always;
+  }
+  .pdf-receipt-header {
+    padding-bottom: 10px;
+    border-bottom: 2px solid #1a1a18;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .pdf-receipt-header .title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a18;
+    letter-spacing: -0.3px;
+  }
+  .pdf-receipt-header .meta {
+    font-size: 12px;
+    color: #777;
+  }
+  .pdf-receipt-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .pdf-receipt-cell {
+    aspect-ratio: 2/3;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pdf-receipt-cell img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* ── 로딩 오버레이 ── */
+  .loading-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 999;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .loading-overlay.show { display: flex; }
+  .loading-box {
+    background: #fff;
+    border-radius: var(--radius);
+    padding: 24px 32px;
+    text-align: center;
+  }
+  .loading-box p { font-size: 14px; font-weight: 500; color: var(--text); margin-top: 10px; }
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 400px) {
+    .content { padding: 12px; }
+    .card { padding: 14px; }
+    .thumb-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <h1>차량 서류 출력</h1>
+  <p>키로수 · 충전 영수증 → PDF</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('kiro')">📍 키로수</button>
+  <button class="tab-btn" onclick="switchTab('receipt')">🧾 충전 영수증</button>
+</div>
+
+<div class="content">
+
+  <!-- ═══════════ 키로수 섹션 ═══════════ -->
+  <div class="section active" id="sec-kiro">
+    <div class="card">
+      <div class="card-title">기본 정보</div>
+      <div class="row">
+        <div class="field"><label>연도</label><input type="number" id="k-year" value="2026" min="2024" max="2035"></div>
+        <div class="field"><label>월</label><input type="number" id="k-month" value="" placeholder="현재월" min="1" max="12"></div>
+      </div>
+      <div class="row">
+        <div class="field wide"><label>차량번호</label><input type="text" id="k-car" value="05호 9966"></div>
+        <div class="field wide"><label>성명</label><input type="text" id="k-name" value="송성민 대리"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>회사명</label><input type="text" id="k-company" value="㈜ 대동산업"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">계기판 사진</div>
+      <div class="upload-zone" id="kiro-zone">
+        <input type="file" accept="image/*" capture="environment" id="kiro-file" onchange="loadKiro(this)">
+        <div class="upload-icon">📷</div>
+        <div class="upload-text">사진 선택 또는 카메라 촬영</div>
+        <div class="upload-sub">JPG · PNG · HEIC</div>
+      </div>
+      <div class="kiro-preview" id="kiro-preview">
+        <img id="kiro-img" src="" alt="계기판 미리보기">
+        <button class="change-btn" onclick="document.getElementById('kiro-file2').click()">변경</button>
+        <input type="file" accept="image/*" id="kiro-file2" style="display:none" onchange="loadKiro(this)">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="kiro-dl-btn" onclick="downloadKiro()" disabled>
+        ⬇ PDF 다운로드
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════ 충전 영수증 섹션 ═══════════ -->
+  <div class="section" id="sec-receipt">
+    <div class="card">
+      <div class="card-title">기본 정보</div>
+      <div class="row">
+        <div class="field"><label>연도</label><input type="number" id="r-year" value="2026" min="2024" max="2035"></div>
+        <div class="field"><label>월</label><input type="number" id="r-month" value="" placeholder="현재월" min="1" max="12"></div>
+      </div>
+      <div class="row">
+        <div class="field wide"><label>차량번호</label><input type="text" id="r-car" value="05호 9966"></div>
+        <div class="field wide"><label>성명</label><input type="text" id="r-name" value="송성민"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        영수증 사진
+        <span class="badge" id="r-badge">0</span>
+      </div>
+      <div class="upload-zone" id="receipt-zone">
+        <input type="file" accept="image/*" multiple id="receipt-file" onchange="loadReceipts(this)">
+        <div class="upload-icon">🧾</div>
+        <div class="upload-text">영수증 선택 (여러 장 가능)</div>
+        <div class="upload-sub">JPG · PNG · A4당 12장 배치</div>
+      </div>
+      <div class="info-bar" id="r-info"></div>
+      <div class="thumb-grid" id="thumb-grid"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="clearReceipts()">초기화</button>
+      <button class="btn primary" id="receipt-dl-btn" onclick="downloadReceipts()" disabled>
+        ⬇ PDF 다운로드
+      </button>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<!-- 로딩 -->
+<div class="loading-overlay" id="loading">
+  <div class="loading-box">
+    <div class="spinner"></div>
+    <p id="loading-msg">PDF 생성 중...</p>
+  </div>
+</div>
+
+<!-- PDF 렌더링 영역 (숨김) -->
+<div id="pdf-render-area"></div>
+
+<script>
+/* ── 초기값 ── */
+const now = new Date();
+document.getElementById('k-month').value = now.getMonth()+1;
+document.getElementById('r-month').value = now.getMonth()+1;
+
+/* ── 탭 전환 ── */
+function switchTab(t) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) =>
+    b.classList.toggle('active', ['kiro','receipt'][i] === t));
+  document.querySelectorAll('.section').forEach((s,i) =>
+    s.classList.toggle('active', ['sec-kiro','sec-receipt'][i] === 'sec-'+t));
+}
+
+/* ════════════════════════════════
+   키로수
+════════════════════════════════ */
+let kiroURL = null;
+
+function loadKiro(inp) {
+  const f = inp.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    kiroURL = e.target.result;
+    document.getElementById('kiro-img').src = kiroURL;
+    document.getElementById('kiro-preview').style.display = 'block';
+    document.getElementById('kiro-zone').style.display = 'none';
+    document.getElementById('kiro-dl-btn').disabled = false;
+  };
+  reader.readAsDataURL(f);
+}
+
+async function downloadKiro() {
+  if (!kiroURL) return;
+  showLoading('키로수 PDF 생성 중...');
+
+  const year    = document.getElementById('k-year').value;
+  const month   = document.getElementById('k-month').value || (now.getMonth()+1);
+  const car     = document.getElementById('k-car').value;
+  const name    = document.getElementById('k-name').value;
+  const company = document.getElementById('k-company').value;
+
+  /* html2canvas로 렌더 → jsPDF */
+  const area = document.getElementById('pdf-render-area');
+  area.innerHTML = `
+    <div class="pdf-kiro-page">
+      <div class="pdf-kiro-header">
+        <div class="title">${year}년 ${month}월 &nbsp;${car}&nbsp; 차량 당월말 키로수</div>
+        <div class="sub">${company} &nbsp; ${name}</div>
+      </div>
+      <div class="pdf-kiro-photo">
+        <img src="${kiroURL}" alt="계기판">
+      </div>
+      <div class="pdf-kiro-footer">㈜ 대동산업 &nbsp;|&nbsp; ${year}년 ${month}월</div>
+    </div>`;
+
+  await waitImgLoad(area);
+  const canvas = await html2canvas(area.querySelector('.pdf-kiro-page'), {
+    scale: 2, useCORS: true, logging: false, backgroundColor: '#fff'
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const imgData = canvas.toDataURL('image/jpeg', 0.92);
+  doc.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+  doc.save(`${year}년_${month}월_키로수.pdf`);
+
+  area.innerHTML = '';
+  hideLoading();
+}
+
+/* ════════════════════════════════
+   충전 영수증
+════════════════════════════════ */
+let receipts = [];
+
+function loadReceipts(inp) {
+  const files = Array.from(inp.files);
+  if (!files.length) return;
+  let done = 0;
+  files.forEach(f => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      receipts.push({ name: f.name, url: e.target.result });
+      done++;
+      if (done === files.length) refreshThumbs();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function refreshThumbs() {
+  const grid = document.getElementById('thumb-grid');
+  grid.innerHTML = '';
+
+  receipts.forEach((r, i) => {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img src="${r.url}" alt="영수증 ${i+1}">
+      <button class="del" onclick="delR(${i})" aria-label="삭제">×</button>
+      <span class="num">${i+1}</span>`;
+    grid.appendChild(d);
+  });
+
+  /* 추가 버튼 */
+  if (receipts.length > 0) {
+    const add = document.createElement('div');
+    add.className = 'add-more';
+    add.innerHTML = `<input type="file" accept="image/*" multiple onchange="loadReceipts(this)">
+      <span class="add-more-icon">＋</span><span>추가</span>`;
+    grid.appendChild(add);
+  }
+
+  const cnt = receipts.length;
+  document.getElementById('r-badge').textContent = cnt;
+  document.getElementById('receipt-dl-btn').disabled = cnt === 0;
+  document.getElementById('receipt-zone').style.display = cnt === 0 ? 'block' : 'none';
+
+  const info = document.getElementById('r-info');
+  if (cnt > 0) {
+    const pages = Math.ceil(cnt / 12);
+    info.style.display = 'block';
+    info.textContent = `총 ${cnt}장 → A4 ${pages}페이지 (페이지당 3열 × 4행, 최대 12장)`;
+  } else {
+    info.style.display = 'none';
+  }
+}
+
+function delR(i) { receipts.splice(i, 1); refreshThumbs(); }
+function clearReceipts() {
+  receipts = [];
+  document.getElementById('receipt-file').value = '';
+  refreshThumbs();
+}
+
+async function downloadReceipts() {
+  if (!receipts.length) return;
+  showLoading('영수증 PDF 생성 중...');
+
+  const year  = document.getElementById('r-year').value;
+  const month = document.getElementById('r-month').value || (now.getMonth()+1);
+  const car   = document.getElementById('r-car').value;
+  const name  = document.getElementById('r-name').value;
+
+  const PER_PAGE = 12;
+  const totalPages = Math.ceil(receipts.length / PER_PAGE);
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const area = document.getElementById('pdf-render-area');
+
+  for (let p = 0; p < totalPages; p++) {
+    showLoading(`영수증 PDF 생성 중... (${p+1}/${totalPages}페이지)`);
+    const batch = receipts.slice(p * PER_PAGE, (p+1) * PER_PAGE);
+    const cells = batch.map(r =>
+      `<div class="pdf-receipt-cell"><img src="${r.url}" alt="영수증"></div>`
+    ).join('');
+    const pageLabel = totalPages > 1 ? ` &nbsp; ${p+1}/${totalPages}` : '';
+
+    area.innerHTML = `
+      <div class="pdf-receipt-page">
+        <div class="pdf-receipt-header">
+          <div class="title">${year}년 ${month}월 &nbsp; 전기차 충전 영수증</div>
+          <div class="meta">${car} &nbsp; ${name}${pageLabel}</div>
+        </div>
+        <div class="pdf-receipt-grid">${cells}</div>
+      </div>`;
+
+    await waitImgLoad(area);
+    const canvas = await html2canvas(area.querySelector('.pdf-receipt-page'), {
+      scale: 2, useCORS: true, logging: false, backgroundColor: '#fff'
+    });
+
+    if (p > 0) doc.addPage();
+    const imgData = canvas.toDataURL('image/jpeg', 0.88);
+    doc.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+  }
+
+  area.innerHTML = '';
+  doc.save(`${year}년_${month}월_충전영수증.pdf`);
+  hideLoading();
+}
+
+/* ── 유틸 ── */
+function waitImgLoad(container) {
+  return new Promise(resolve => {
+    const imgs = Array.from(container.querySelectorAll('img'));
+    if (!imgs.length) { resolve(); return; }
+    let loaded = 0;
+    imgs.forEach(img => {
+      if (img.complete) { if (++loaded === imgs.length) resolve(); }
+      else {
+        img.onload  = () => { if (++loaded === imgs.length) resolve(); };
+        img.onerror = () => { if (++loaded === imgs.length) resolve(); };
+      }
+    });
+  });
+}
+
+function showLoading(msg) {
+  document.getElementById('loading-msg').textContent = msg || 'PDF 생성 중...';
+  document.getElementById('loading').classList.add('show');
+}
+function hideLoading() {
+  document.getElementById('loading').classList.remove('show');
+}
+
+/* ── 드래그앤드롭 ── */
+['kiro-zone','receipt-zone'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('drag');
+    const inp = el.querySelector('input[type=file]');
+    if (inp && e.dataTransfer.files.length) {
+      Object.defineProperty(inp, 'files', { value: e.dataTransfer.files, configurable: true });
+      inp.dispatchEvent(new Event('change'));
+    }
+  });
+});
+</script>
+</body>
+</html>
